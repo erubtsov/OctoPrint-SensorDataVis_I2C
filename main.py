@@ -1,7 +1,8 @@
 import logging
 import sys
 
-import arduino
+#import arduino
+import i2c_stream
 import config
 import data_collector
 import lims
@@ -24,13 +25,7 @@ def main():
 
     data_collector._logger = logger
 
-    arduino.start_streaming(
-        config.ARDUINO_PORT,
-        config.ARDUINO_BAUD, 
-        None,
-        None,
-        logger
-    )
+    i2c_stream.start_streaming(logger)
 
     # lims.start_streaming(
     #     config.LIMS_IP,
@@ -50,8 +45,8 @@ def main():
         continue
 
     logger.warn("[Main] Shutting down because one of the threads died...")
-    arduino.stop_streaming()
-    lims.stop_streaming()
+    i2c_stream.stop_streaming()
+    #lims.stop_streaming()
 
 if __name__ == '__main__':
     main()
