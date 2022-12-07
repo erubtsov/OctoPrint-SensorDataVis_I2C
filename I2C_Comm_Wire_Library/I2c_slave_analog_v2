@@ -3,14 +3,14 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #define F_CPU 16500000UL
-float AcsValue=0.0,Samples=0.0,AvgAcs=0.0,AcsValueF=0.0;
+float AcsValue = 0.0, AcsValueF = 0.0;
 
-void adc_setup(){
- DDRB|=(1<<PB2);         //PB2 as output to activate LED
- ADCSRA|=(1<<ADEN);      //Enable ADC module
- ADMUX = 0b00000011; // configuring PB3 to take input
- ADCSRB=0x00;           //Configuring free running mode
- ADCSRA|=(1<<ADSC)|(1<<ADATE);   //Start ADC conversion and enabling Auto trigger
+void adc_setup() {
+  DDRB |= (1 << PB2);     //PB2 as output to activate LED
+  ADCSRA |= (1 << ADEN);  //Enable ADC module
+  ADMUX = 0b00000011; // configuring PB3 to take input
+  ADCSRB = 0x00;         //Configuring free running mode
+  ADCSRA |= (1 << ADSC) | (1 << ADATE); //Start ADC conversion and enabling Auto trigger
 }
 
 void requestEvent() {
@@ -18,11 +18,11 @@ void requestEvent() {
 }
 void setup() {
   adc_setup();
-  Wire.begin(0x02);
+  Wire.begin(0x08); #Enter device (sensor processor) address here
 }
-void loop(){
-    AcsValue = (ADCH<<8)|ADCL;   //Reading ADCH and combining the data;     //Read current sensor values   
-    AcsValueF = (2.5 - (AvgAcs * (5.0 / 1024.0)) )/0.100;
-    ADCSRA|=(1<<ADIF);       //Resets soure register
-    Wire.onRequest(requestEvent);
+void loop() {
+  AcsValue = (ADCH << 8) | ADCL; //Reading ADCH and combining the data;     //Read current sensor values
+  AcsValueF = (2.5 - (AcsValue * (5.0 / 1024.0)) ) / 0.100;
+  ADCSRA |= (1 << ADIF);   //Resets soure register
+  Wire.onRequest(requestEvent);
 }
