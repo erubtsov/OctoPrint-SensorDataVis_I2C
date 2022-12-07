@@ -59,9 +59,6 @@ def stream_loop():
         #data_collector.record_metric(sensor4.sensorName, sensor4.i2cRead())
                 #START HERE
                
-       
-    _dat.conn.close()
-    _dat.conn = None
     _dat.logger.info(f'[i2c] Stopped streaming..')
 
 def get_ports():
