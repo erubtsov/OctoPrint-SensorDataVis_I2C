@@ -6,6 +6,10 @@ import data_collector
 from api_oprint import APIOctoPrint
 import config
 import time
+import requests
+from requsts.adapters import HTTPAdapter
+#from requests.exceptions import ConnectionError
+from urlib3.util.retry import Retry
 
 class RawData():
     def __init__(self) -> None:
@@ -22,6 +26,14 @@ _raw = RawData()
 msgQueue = queue.Queue()
 
 def stream_loop():
+    session = requests.Session()
+    retry = Retry(connect=30, backoff_factor = 0.25)
+    adapter = HTTPAdapter(max_retries = retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    session.get(config.API_URL)
+    #time.sleep(0.25)
+    
     _raw.logger.debug('[RAW DATA] Started Streaming...')
     api = APIOctoPrint(api_url=config.API_URL, api_secret=config.API_SECRET)
     j = api.get_api_job()
