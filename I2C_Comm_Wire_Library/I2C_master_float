@@ -1,17 +1,261 @@
+/**
+ * Required Libraries:
+ *  - ArduinoJSON 
+ *  - DHT Sensor Library
+ *  - Adafruit Unified Sensor library https://www.pjrc.com/teensy/td_libs_Encoder.html
+ */
+
+#include <ArduinoJson.h>
+#include <DHT.h>
 #include <Wire.h>
+#include "Adafruit_seesaw.h"
+#include <seesaw_neopixel.h>
 
-float sig;
+#define SS_SWITCH        24
+#define SS_NEOPIX        6
 
-void setup(){
-  Wire.begin(0x02);
-  Serial.begin(115200);
+#define SEESAW_ADDR          0x36
+Adafruit_seesaw ss;
+seesaw_NeoPixel sspixel = seesaw_NeoPixel(1, SS_NEOPIX, NEO_GRB + NEO_KHZ800);
+
+// #include <Encoder.h> //https://www.pjrc.com/teensy/td_libs_Encoder.html
+
+
+
+/**
+ * Precise linear interpolation in interval [lo,hi] by t.
+ * 
+ * @param lo  lower value of the interval
+ * @param hi  upper value of the interval
+ * @param t   t in [0,1]
+ * @return    Precise linearly interpolated value in the interval [lo,hi]
+ * 
+ * This method of calculation ensures that lo is returned when t==0 and
+ * hi is returned when t==1.  The more commmon implementation is susceptible
+ * to roundoff error resulting in incorrect values at the extrema.
+ * 
+ * https://en.wikipedia.org/wiki/Linear_interpolation
+ */
+inline float lerpf(float lo, float hi, float t) {
+  return (1 - t) * lo + t * hi;
 }
-void loop()
-{             // request 8 bytes from slave device #2
-  int avail = Wire.requestFrom(0x02, 4);
-  if (avail == 4)
-  { 
-    Wire.readBytes((byte*)&sig, 4);
-    Serial.println(sig,2);//print with 4 dp
+
+/**
+ * Maps value from the interval [fromLo,fromHi] to [toLo,toHi]
+ * 
+ * Same as : https://www.arduino.cc/reference/en/language/functions/math/map/
+ * But for floating point numbers.
+ * 
+ * @param value   value in [fromLo,fromHi]
+ * @param fromLo  lower value of the source interval
+ * @param fromHi  upper value of the source interval
+ * @param toLo    lower value of the target interval
+ * @param toHi    upper value of the target interval
+ * @return  value mapped from the source interval to the target interval
+ */
+inline float mapf(float value, float fromLo, float fromHi, float toLo, float toHi) {
+    float t = (value - fromLo) / (fromHi - fromLo);
+    return lerpf(toLo, toHi, t);
+}
+
+class Sensor {
+  public:
+    Sensor() = delete;
+    ~Sensor() = default;
+    Sensor(const Sensor&) = delete;
+
+    Sensor(const String& lims_field)
+      : _lims_field(lims_field) {}
+    
+    /**
+     * NOTE: You do not generally want to use virtual functions on a microcontroller.
+     * They have performance overhead due to VTable lookups.  But we don't care in this
+     * instance because we don't care about 'real time'.
+     */
+    virtual bool read() = 0;
+    virtual void publish(JsonObject& obj) const = 0;
+
+    // optional...
+    virtual void begin() {}
+
+    const String lims_field() const { return this->_lims_field; }
+
+  private:
+    const String _lims_field;
+};
+
+class I2CFloatPublisher : public Sensor {
+  public:
+  I2CFloatPublisher(const String& lims_field, const String& sensorName, int address)
+    : Sensor(lims_field), _value(-1), _address(address){}
+  void begin()override{
+    Wire.begin(_address);
   }
+  bool read()override{ 
+      float sig;
+      int avail = Wire.requestFrom(_address, 4);
+      if (avail == 4)
+      { 
+        Wire.readBytes((byte*)&sig, 4);
+        this->value(sig);
+      }
+    return true;
+  }
+  void publish(JsonObject& obj) const override {
+    obj["lims_field"] = this->lims_field();
+    obj["value"] = this->value();
+  }
+
+  const float value() const { return this->_value; }
+  void value(float value) { this->_value = value; }
+
+  private:
+    float _value;
+    int _address;
+};
+
+/*
+class EncoderSensor : public Sensor {
+   public:
+     EncoderSensor(const String& lims_field, const String& sensorName, int address)
+       : Sensor(lims_field), _value(-1), _address(address) {}
+    
+     void begin()override{
+      // set not so bright!
+      sspixel.setBrightness(20);
+      sspixel.show();  
+      if (! ss.begin(SEESAW_ADDR) || ! sspixel.begin(SEESAW_ADDR)) {
+        Serial.println("Couldn't find seesaw on default address");
+        while(1) delay(10);
+      }
+      Serial.println("seesaw started");
+      // use a pin for the built in encoder switch
+      ss.pinMode(SS_SWITCH, INPUT_PULLUP);
+    
+      // get starting position
+      encoder_position = ss.getEncoderPosition();
+      ss.setGPIOInterrupts((uint32_t)1 << SS_SWITCH, 1);
+      ss.enableEncoderInterrupt();
+     }
+
+     bool read() override {
+         int32_t new_position = ss.getEncoderPosition();
+         if (encoder_position != new_position) {
+          this->value(new_position);         // display new position
+      
+          // change the neopixel color
+          sspixel.setPixelColor(0, Wheel(new_position & 0xFF));
+          sspixel.show();
+          encoder_position = new_position;      // and save for next round
+        }
+       return true;
+     }
+     uint32_t Wheel(byte WheelPos) {
+      WheelPos = 255 - WheelPos;
+      if (WheelPos < 85) {
+        return sspixel.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+      }
+      if (WheelPos < 170) {
+        WheelPos -= 85;
+        return sspixel.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+      }
+      WheelPos -= 170;
+      return sspixel.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+    }
+     void publish(JsonObject& obj) const override {
+       obj["lims_field"] = this->lims_field();
+       obj["value"] = this->value();
+     }
+
+     float value() const { return this->_value; }
+     void value(float value) { this->_value = value; }
+     
+   private:
+     int _address; 
+     float _value;
+     int32_t encoder_position;
+};
+
+class DHTSensor : public Sensor {
+  public:
+    DHTSensor(const String& lims_field, uint8_t pin, uint8_t type = DHT22, bool as_farenheit = true)
+      : Sensor(lims_field), _dht(pin, type), _as_farenheit(as_farenheit), _temperature(-1.0f), _humidity(-1.0f) {}
+    
+    void begin() override {
+      _dht.begin();
+    }
+
+    bool read() override {
+      _temperature = _dht.readTemperature(_as_farenheit);
+      _humidity = _dht.readHumidity();
+
+      if (isnan(_temperature)) _temperature = -100.0f;
+      if (isnan(_humidity)) _humidity = -100.0f;
+      return true;
+    }
+
+    void publish(JsonObject &obj) const override {
+      auto arr = obj.createNestedArray("values");
+
+      auto temp = arr.createNestedObject();
+      temp["lims_field"] = this->lims_field() + ".Temperature";
+      temp["value"] = this->temperature();
+
+      auto hum = arr.createNestedObject();
+      hum["lims_field"] = this->lims_field() + ".Humidity";
+      hum["value"] = this->humidity();
+    }
+    
+    float temperature() const { return this->_temperature; }
+    float humidity() const { return this->_humidity; }
+    bool as_farenheit() const { return this->_as_farenheit; }
+
+  private:
+    DHT _dht;
+    bool _as_farenheit;
+    float _temperature;
+    float _humidity;
+};
+*/
+Sensor* sensors[] = {
+  new I2CFloatPublisher("Pushpa","Current1", 0x13),
+  //new I2CFloatPublisher("Pushpa","Current2", 0x09),
+  //new I2CFloatPublisher("Pushpa","Current3", 0x10),
+  //new I2CFloatPublisher("Pushpa","Current4", 0x05),
+  //new I2CFloatPublisher("Pushpa","Current5", 0x06),
+  //new I2CFloatPublisher("Pushpa","Current6", 0x07),
+  //new I2CFloatPublisher("Pushpa","Current7", 0x08),
+  //new EncoderSensor("Pushpa","Encoder", 0x36)
+};
+
+const int num_sensors = sizeof(sensors)/sizeof(sensors[0]);
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) continue;
+
+  for (int i = 0; i < num_sensors; ++i)
+    sensors[i]->begin();
+}
+
+void loop() {
+  /*
+  A size of 384 is what is recommended for 6 sensors by the ArduinoJson Assistant:
+  https://arduinojson.org/v6/assistant/
+  I am using a value of 1024 here simply because we will be adding additional sensors
+  and our sketch is going to be very light on the processing/memory requirements side.
+  */
+  // StaticJsonDocument<384> doc;
+  StaticJsonDocument<1024> doc;
+
+  auto json = doc.createNestedArray("sensors");
+  for (int i = 0; i < num_sensors; ++i) {
+    if (sensors[i]->read()) {
+      auto obj = json.createNestedObject();
+      sensors[i]->publish(obj);
+    }
+  }
+
+  serializeJson(doc, Serial);
+  Serial.println();
 }
