@@ -5,6 +5,9 @@
 #define F_CPU 16500000UL
 float AcsValue = 0.0, AcsValueF = 0.0;
 
+byte b[4];
+int data[9];
+
 void adc_setup() {
   DDRB |= (1 << PB2);     //PB2 as output to activate LED
   ADCSRA |= (1 << ADEN);  //Enable ADC module
@@ -13,16 +16,24 @@ void adc_setup() {
   ADCSRA |= (1 << ADSC) | (1 << ADATE); //Start ADC conversion and enabling Auto trigger
 }
 
-void requestEvent() {
+void receiveData(int byteCount) {
+  int counter = 0;
+  while(Wire.available()){
+    data[counter] = Wire.read();
+    counter++;
+  }
+}
+void sendData(){
   Wire.write((byte*)&AcsValueF, 4);
 }
 void setup() {
   adc_setup();
-  Wire.begin(0x08); #Enter device (sensor processor) address here
+  Wire.begin(0x14);
+  Wire.onReceive(receiveData);
+  Wire.onRequest(sendData);
 }
 void loop() {
   AcsValue = (ADCH << 8) | ADCL; //Reading ADCH and combining the data;     //Read current sensor values
   AcsValueF = (2.5 - (AcsValue * (5.0 / 1024.0)) ) / 0.100;
   ADCSRA |= (1 << ADIF);   //Resets soure register
-  Wire.onRequest(requestEvent);
 }
