@@ -9,6 +9,26 @@ from smbus import SMBus
 import struct
 
 bus = SMBus(1)
+seesaw = seesaw.Seesaw(i2c, addr=0x36)
+ 
+
+seesaw.pin_mode(24, seesaw.INPUT_PULLUP)
+
+ 
+
+encoder = rotaryio.IncrementalEncoder(seesaw)
+last_position = 0
+class feedRate():
+    def __init__(self, _sensorName, lastPos):
+        self.sensorName = _sensorName
+        self.lastPos = lastPos
+    def __str__(self):
+        return f'{self.sensorName}'
+    def feedRead(self):
+        position = -encoder.position
+        if position != self.lastPos:
+            self.lastPos = position
+        return position
 
 class I2CFloatPublisher():
     def __init__(self, _sensorName, _address, _ret):
