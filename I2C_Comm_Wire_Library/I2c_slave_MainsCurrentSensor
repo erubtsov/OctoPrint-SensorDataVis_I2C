@@ -1,8 +1,4 @@
 #include <Wire.h>
-//#include <avr/io.h>
-//#include <avr/interrupt.h>
-//#define F_CPU 16500000UL
-//float AcsValue = 0.0, AcsValueF = 0.0, AmpsRMS=0.0, VRMS=0.0;
 float AmpsRMS = 0.0;
 const int mVperAmp = 66;
 byte b[4];
