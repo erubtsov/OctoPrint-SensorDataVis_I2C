@@ -1,0 +1,36 @@
+#include <Wire.h>
+static constexpr float sensitivity_05B = 0.185;
+static constexpr float sensitivity_20A = 0.100;
+static constexpr float sensitivity_30A = 0.066;
+float value;
+
+const float VCC = 5.0;
+const float QOV = 0.5 * VCC;
+const float ADC_RESOLUTION = 1023.0;
+
+float AmpsRMS = 0.0;
+const int mVperAmp = 66;
+byte b[4];
+int data[9];
+
+void receiveData(int byteCount) {
+  int counter = 0;
+  while(Wire.available()){
+    data[counter] = Wire.read();
+    counter++;
+  }
+}
+void sendData(){
+  Wire.write((byte*)&value, 4);
+}
+void setup() {
+  pinMode(3,INPUT);
+  Wire.begin(0x15);
+  Wire.onReceive(receiveData);
+  Wire.onRequest(sendData);
+}
+void loop() {
+   float voltage_raw = (VCC/ADC_RESOLUTION)*analogRead(3);
+   float voltage = voltage_raw - QOV + 0.012;
+   value = voltage/sensitivity_30A;
+}
