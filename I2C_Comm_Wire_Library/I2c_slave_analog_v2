@@ -1,20 +1,12 @@
-
 #include <Wire.h>
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#define F_CPU 16500000UL
-float AcsValue = 0.0, AcsValueF = 0.0;
-
+//#include <avr/io.h>
+//#include <avr/interrupt.h>
+//#define F_CPU 16500000UL
+//float AcsValue = 0.0, AcsValueF = 0.0, AmpsRMS=0.0, VRMS=0.0;
+float AmpsRMS = 0.0;
+const int mVperAmp = 66;
 byte b[4];
 int data[9];
-
-void adc_setup() {
-  DDRB |= (1 << PB2);     //PB2 as output to activate LED
-  ADCSRA |= (1 << ADEN);  //Enable ADC module
-  ADMUX = 0b00000011; // configuring PB3 to take input
-  ADCSRB = 0x00;         //Configuring free running mode
-  ADCSRA |= (1 << ADSC) | (1 << ADATE); //Start ADC conversion and enabling Auto trigger
-}
 
 void receiveData(int byteCount) {
   int counter = 0;
@@ -24,16 +16,37 @@ void receiveData(int byteCount) {
   }
 }
 void sendData(){
-  Wire.write((byte*)&AcsValueF, 4);
+  Wire.write((byte*)&AmpsRMS, 4);
 }
 void setup() {
-  adc_setup();
-  Wire.begin(0x14);
+  pinMode(3,INPUT);
+  Wire.begin(0x15);
   Wire.onReceive(receiveData);
   Wire.onRequest(sendData);
 }
 void loop() {
-  AcsValue = (ADCH << 8) | ADCL; //Reading ADCH and combining the data;     //Read current sensor values
-  AcsValueF = (2.5 - (AcsValue * (5.0 / 1024.0)) ) / 0.100;
-  ADCSRA |= (1 << ADIF);   //Resets soure register
+   float MCresult;
+   int readValue;             //value read from the sensor
+   int maxValue = 0;          // store max value here
+   int minValue = 1024;          // store min value here
+   uint32_t start_time = millis();
+   
+   while((millis()-start_time) < 16) //sample for 1 Sec
+   {
+       readValue = analogRead(3);
+       // see if you have a new maxValue
+       if (readValue > maxValue) 
+       {
+           /*record the maximum sensor value*/
+           maxValue = readValue;
+       }
+       if (readValue < minValue) 
+       {
+           /*record the minimum sensor value*/
+           minValue = readValue;
+       }
+   }
+   MCresult = ((maxValue - minValue) * 5.0)/1024.0;
+   float VRMS = (MCresult/2.0) *0.707;  //root 2 is 0.707
+   AmpsRMS = (VRMS * 1000)/mVperAmp;
 }
