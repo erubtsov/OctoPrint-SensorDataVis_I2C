@@ -15,7 +15,6 @@ File dataLog;
 const int chipSelect = 4;
 float humidity;
 String command = "";
-int counter = 0;
 String fileName;
 bool collect;
 
@@ -29,18 +28,16 @@ void setup()
   Serial.begin(115200);
   pinMode(green, OUTPUT);
   pinMode(red, OUTPUT);
-  while(!Serial){
-    fileName = "test.csv";
-    pinMode(chipSelect, OUTPUT); //chip select pin must be set to output mode
-    !SD.begin(chipSelect))
-    if(SD.exists(fileName)){ //if a file exists, delete it
-      SD.remove(fileName)
-      
-    dataLog = SD.open(fileName, FILE_WRITE);
-    if(dataLog)
-        digitalWrite(green, HIGH);
-    dataLog.println("Time,Temperature,Humidity");
-  }
+  fileName = "test.csv";
+  pinMode(chipSelect, OUTPUT); //chip select pin must be set to output mode
+  !SD.begin(chipSelect))
+  if(SD.exists(fileName)){ //if a file exists, delete it
+    SD.remove(fileName)
+
+  dataLog = SD.open(fileName, FILE_WRITE);
+  if(dataLog)
+      digitalWrite(green, HIGH);
+  dataLog.println("Time,Temperature,Humidity");
   dht.begin();
 }
 
@@ -49,21 +46,14 @@ void loop()
 {
   float h = dht.readHumidity();
   float t = dht.readTemperature();
-  
   unsigned long currentMillis = millis();
-  
-  while(Serial){
-    if(!Serial.available()){                
-      command = Serial.readString();   
-    }
-    if (currentMillis - previousMillis >= interval) {
-        dataLog.println((String)counter + " " +  (String)t + " " +  (String)h);
-        previousMillis = currentMillis;       
-        if(colllect){
-          dataLog.close();
-          digitalWrite(green, LOW);
-          digitalWrite(red, HIGH);
-        }
-    }
+  if (currentMillis - previousMillis >= interval) {
+      dataLog.println((String)counter + " " +  (String)t + " " +  (String)h);
+      previousMillis = currentMillis;       
+      if(colllect){
+        dataLog.close();
+        digitalWrite(green, LOW);
+        digitalWrite(red, HIGH);
+     }
   }
 }
