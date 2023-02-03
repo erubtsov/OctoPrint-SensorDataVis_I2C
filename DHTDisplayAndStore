@@ -2,59 +2,46 @@
 //Compatible with the Arduino IDE 1.0
 //Library version:1.1
 #include <Wire.h> 
-#include <LiquidCrystal_I2C.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
 #include <SD.h>
-#include <SPI.h>
+
+#define red 5
+#define green 6
+#define collect 3
+
 File dataLog;
 const int chipSelect = 4;
 float humidity;
 String command = "";
 int counter = 0;
 String fileName;
+bool collect;
 
+const long interval = 5000; // interval at which to blink (milliseconds)
+unsigned long previousMillis = 0;  // will store last time LED was updated
 LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 DHT dht(8, DHT22);
 
-void printMenu() {
-  // put your setup code here, to run once:
-  delay(1000);
-  Serial.println("Data Acquisition Menu");
-  Serial.println("1) Start Recording");
-  Serial.println("2) Pack data");
-  Serial.println("Enter selection");
-}
 void setup()
 {
   Serial.begin(115200);
+  pinMode(green, OUTPUT);
+  pinMode(red, OUTPUT);
   while(!Serial){
     fileName = "test.csv";
     pinMode(chipSelect, OUTPUT); //chip select pin must be set to output mode
-    delay(100);
-    Serial.println("Initializing SD card...");
-    if(!(SD.begin(chipSelect))){//Initialize SD card
-      Serial.println("Could not initialize SD card."); //if return false, initialization failed
-    }
+    !SD.begin(chipSelect))
     if(SD.exists(fileName)){ //if a file exists, delete it
-      Serial.println("File exists; deleting...");
-      if(SD.remove(fileName)){
-        Serial.println("Successfully removed file.");
-      }else{
-        Serial.println("Could not remove fie.");
-      }
-    }
+      SD.remove(fileName)
+      
     dataLog = SD.open(fileName, FILE_WRITE);
-    Serial.println("File created: " + (String)dataLog.name());
+    if(dataLog)
+        digitalWrite(green, HIGH);
     dataLog.println("Time,Temperature,Humidity");
   }
-  lcd.init();                      // initialize the lcd 
-  lcd.init();
   dht.begin();
-  // Print a message to the LCD.
-  lcd.backlight();
-  printMenu();
 }
 
 
@@ -62,35 +49,21 @@ void loop()
 {
   float h = dht.readHumidity();
   float t = dht.readTemperature();
+  
+  unsigned long currentMillis = millis();
+  
   while(Serial){
     if(!Serial.available()){                
       command = Serial.readString();   
     }
-    if(command.equals("1\n")){
-      dataLog.println((String)counter + " " +  (String)t + " " +  (String)h);
-      Serial.println("Recording...");
-    }else if(command.equals("2\n")){
-      dataLog.close();
-      command = "";
-      Serial.println("Packing Data...");
-    }else if(!command.equals("")){
-      Serial.println("Invalid Command");
-      while(!Serial.available()){
-        delay(500);
-      }
+    if (currentMillis - previousMillis >= interval) {
+        dataLog.println((String)counter + " " +  (String)t + " " +  (String)h);
+        previousMillis = currentMillis;       
+        if(colllect){
+          dataLog.close();
+          digitalWrite(green, LOW);
+          digitalWrite(red, HIGH);
+        }
     }
-  lcd.setCursor(0,0);
-  lcd.print("Temp: ");
-  lcd.setCursor(6,0);
-  lcd.print(t);
-  lcd.print(" C");
-  lcd.setCursor(0,1);
-  lcd.print("Humidity: ");
-  lcd.print(h);
-  lcd.print("%");
-  delay(5000);
-  lcd.noBacklight();
-  delay(55000);
   }
-  delay(2000);
 }
