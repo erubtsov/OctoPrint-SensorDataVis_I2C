@@ -32,5 +32,5 @@ void setup() {
 void loop() {
    float voltage_raw = (VCC/ADC_RESOLUTION)*analogRead(3);
    float voltage = voltage_raw - QOV + 0.012;
-   value = voltage/sensitivity_30A;
+   value = voltage/sensitivity_20A;
 }
