@@ -1,0 +1,29 @@
+#include <Wire.h>
+
+float AmpsRMS = 0.0;
+const int mVperAmp = 66;
+byte b[4];
+int data[9];
+const int OutPin  = 3;   // wind sensor analog pin  hooked up to Wind P sensor "OUT" pin
+float windMPH;
+
+void receiveData(int byteCount) {
+  int counter = 0;
+  while(Wire.available()){
+    data[counter] = Wire.read();
+    counter++;
+  }
+}
+void sendData(){
+  Wire.write((byte*)&windMPH, 4);
+}
+void setup() {
+  pinMode(3,INPUT);
+  Wire.begin(0x28);
+  Wire.onReceive(receiveData);
+  Wire.onRequest(sendData);
+}
+void loop() {
+   int windADunits = analogRead(OutPin);
+   windMPH =  pow((((float)windADunits - 264.0) / 85.6814), 3.36814);
+}
